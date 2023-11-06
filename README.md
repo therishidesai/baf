@@ -68,6 +68,16 @@ on stdin.
 For a more detailed example look at `baf-test` inside of the flake.nix
 in this repo.
 
+### Notes
+
+- Even though `/dev/fanout` is one to many, you can actually have
+  multiple writers on the topic but the linux character device system
+  will force these writes to be synchronous slowing down
+  publishers. baf currently doesn't check if there are multiple
+  writers on a device so for performance make sure to only have one
+  publisher per topic.
+
+
 ## TODO
 
 - finish initial static pubmsg/submsg
