@@ -34,11 +34,12 @@ in this repo.
 
 **NOTE: A `baf-test` topic will always be added for debugging**
 
-### pubmsg (TODO)
+### pubmsg
 
 `pubmsg <topic-name>` is the simple program that a publisher can
 use. It will use the topic name to find the correct `/dev/baf` symlink
-and then will pipe any data on stdin to the `/dev/baf` device.
+and then will pipe any data on stdin to the `/dev/baf` device. If the
+topic is already in use or `/dev/baf` file doesn't exist it will exit.
 
 Example usage:
 
@@ -67,15 +68,6 @@ on stdin.
 
 For a more detailed example look at `baf-test` inside of the flake.nix
 in this repo.
-
-### Notes
-
-- Even though `/dev/fanout` is one to many, you can actually have
-  multiple writers on the topic but the linux character device system
-  will force these writes to be synchronous slowing down
-  publishers. baf currently doesn't check if there are multiple
-  writers on a device so for performance make sure to only have one
-  publisher per topic.
 
 
 ## TODO

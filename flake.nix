@@ -1,15 +1,13 @@
 {
   # This is a template created by `hix init`
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
-  inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+  inputs.nixpkgs.url = "github:therishidesai/nixpkgs/rdesai/haskell-fanout";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   outputs = { self, nixpkgs, flake-utils, haskellNix }:
     let
       supportedSystems = [
         "x86_64-linux"
-        "x86_64-darwin"
         "aarch64-linux"
-        "aarch64-darwin"
       ];
     in
       flake-utils.lib.eachSystem supportedSystems (system:
@@ -28,22 +26,89 @@
       in flake // {
         legacyPackages = pkgs;
 
-        packages.piped = flake.packages."piped:exe:piped";
-        packages.pubmsg = flake.packages."piped:exe:pubmsg";
-        packages.submsg = flake.packages."piped:exe:submsg";
-        packages.bw-test = pkgs.writeShellApplication {
-          name = "bw-test";
-          runtimeInputs =  with self.packages.${system}; [
-            pkgs.coreutils
-            piped
-            pubmsg
-            submsg
-            pkgs.pv
-            pkgs.nmap
-            pkgs.outils
-          ];
+        packages.pubmsg = flake.packages."baf:exe:pubmsg";
+        packages.submsg = flake.packages."baf:exe:submsg";
 
-          text = builtins.readFile ./bw.sh;
+        nixosModules.baf = { config, lib, pkgs, ... }:
+          with lib;
+          let cfg = config.baf.services.baf-setup;
+              pubs = [ "baf-test" ] ++ cfg.topics;
+              lnPubs = lists.imap0 (i: p: "ln -s /dev/fanout${builtins.toString i} /dev/baf/${p}") pubs;
+          in {
+            options.baf.services.baf-setup = {
+              enable = mkEnableOption "Enable the big ass fan!";
+              topics = mkOption {
+                type = types.listOf types.str;
+                default = [ ];
+                description = "A list of publisher topics";
+              };
+              bufferSize = lib.mkOption {
+                type = lib.types.int;
+                default = 16384;
+                description = "Size of /dev/fanout buffer in bytes";
+              };
+            };
+
+            config = mkIf cfg.enable {
+              services.fanout = {
+                enable = true;
+                fanoutDevices = builtins.length pubs;
+                bufferSize = cfg.bufferSize;
+              };
+
+              systemd.tmpfiles.rules = [
+                "d /dev/baf 0755 root root"
+              ];
+
+              systemd.services.baf-setup = {
+                description = "Turn on the big ass fan!";
+                script = strings.concatLines lnPubs;
+
+                after = [ "fanout.service" ];
+                requires = [ "fanout.service" ];
+                wantedBy = [ "multi-user.target" ];
+                serviceConfig = {
+                  Type = "oneshot";
+                  User = "root";
+                  RemainAfterExit = "yes";
+                  Restart = "no";
+                };
+              };
+            };
+          };
+
+        packages.baf-test = pkgs.nixosTest {
+          name = "ipc-regression-test";
+          nodes.machine = { config, lib, ... }: {
+            imports = lib.attrValues self.nixosModules."${system}";
+
+            config = {
+              users.users = {
+                baf = {
+                  isNormalUser = true;
+                  password = "baf";
+                  description = "baf";
+                  extraGroups = [ "networkmanager" "wheel" "dialout" "i2c" ];
+                };
+              };
+
+              baf.services.baf-setup = {
+                enable = true;
+                topics = [ "test" ];
+              };
+              
+              environment.systemPackages = [
+                pkgs.tmux
+                self.packages."${system}".pubmsg
+              ];
+            };
+
+          };
+
+          testScript = ''
+            start_all()
+            machine.wait_for_unit("baf.service")
+          '';
         };
       });
 
