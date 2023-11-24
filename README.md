@@ -56,7 +56,8 @@ in this repo.
 `submsg` is the program a subscriber can use to get data. With no
 args, `submsg` will subscribe to every topic and feed data to a
 publisher via stdin. A user can provide a list of topics, `submsg
-[TOPICS]`, to only get data from those `/dev/baf` character devices.
+[TOPICS]`, to only get data from those `/dev/baf` character devices. A
+user can also use the `-e` flag to provide a list of topics to ignore.
 
 Example 
 ```
@@ -65,6 +66,14 @@ submsg topic1 topic2 | service-y
 
 This will take data from topic1 and topic2 and send it to `service-y`
 on stdin.
+
+Example
+```
+submsg -e topic1 | service-y
+```
+
+This will take data from every topic except for topic1 send it to
+`service-y` on stdin.
 
 For a more detailed example look at `baf-test` inside of the flake.nix
 in this repo.

@@ -19,8 +19,9 @@ import Options.Applicative
 
 import Prelude as P
 
-newtype SubmsgArgs = SubmsgArgs
-  { topics :: Maybe String }
+data SubmsgArgs = SubmsgArgs
+  { topics :: Maybe String, 
+    exclude :: Bool }
 
 
 subWorker :: Handle -> TChan BS.ByteString -> IO ()
@@ -34,9 +35,21 @@ parseArgs = SubmsgArgs
          <$> optional (argument str
              ( metavar "TOPICS"
              <> help "Topics to subscribe to, if none given then all topics will be used. Use a comma separated string" ))
+         <*> switch
+             ( long "exclude"
+             <> short 'e'
+             <> help "Whether to exclude the TOPICS passed in" )
 
-getSubs :: Maybe String -> IO [FilePath]
-getSubs (Just t) = do
+getSubs :: Maybe String -> Bool -> IO [FilePath]
+
+getSubs (Just t) True = do
+  let ts = BS.pack t
+  d <- listDirectory "/dev/baf"
+  let s = P.filter (\l -> BS.length l > 0) $ P.map BS.strip $ BS.split ',' ts
+  let ss = P.map (T.unpack .TE.decodeUtf8) s
+  return (P.filter (`P.notElem` ss) d)
+
+getSubs (Just t) False = do
   let ts = BS.pack t
   d <- listDirectory "/dev/baf"
   let ds = P.map BS.pack d
@@ -47,7 +60,7 @@ getSubs (Just t) = do
     return (P.map (T.unpack . TE.decodeUtf8) s)
 
   
-getSubs Nothing = do
+getSubs Nothing _ = do
   listDirectory "/dev/baf"
 
 startSubs :: FilePath -> TChan BS.ByteString -> IO ()
@@ -59,8 +72,8 @@ startSubs f c = do
   return ()
 
 startSubmsg :: SubmsgArgs -> IO ()
-startSubmsg (SubmsgArgs t) = do
-  s <- getSubs t
+startSubmsg (SubmsgArgs t e) = do
+  s <- getSubs t e
   c <- newTChanIO
   forM_ s  $ \x -> do
     _ <- forkIO $ startSubs ("/dev/baf/" ++ x) c
