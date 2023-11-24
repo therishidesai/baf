@@ -14,7 +14,7 @@ import System.Posix.IO
 
 import Options.Applicative
 
-data PubmsgArgs = PubmsgArgs
+newtype PubmsgArgs = PubmsgArgs
   { topic :: String }
 
 

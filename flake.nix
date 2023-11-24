@@ -100,6 +100,7 @@
               environment.systemPackages = [
                 pkgs.tmux
                 self.packages."${system}".pubmsg
+                self.packages."${system}".submsg
               ];
             };
 
