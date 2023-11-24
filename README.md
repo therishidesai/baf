@@ -51,7 +51,7 @@ reading off of the `/dev/baf` character device.
 For a more detailed example look at `baf-test` inside of the flake.nix
 in this repo.
 
-### submsg (TODO)
+### submsg
 
 `submsg` is the program a subscriber can use to get data. With no
 args, `submsg` will subscribe to every topic and feed data to a
