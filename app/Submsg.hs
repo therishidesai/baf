@@ -5,6 +5,8 @@ import System.Directory
 import System.Posix.IO
 import System.Posix.Files
 
+import Data.Text as T
+import Data.Text.Encoding as TE
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL
 
@@ -14,6 +16,8 @@ import Control.Concurrent
 import Control.Concurrent.STM
 
 import Options.Applicative
+
+import Prelude as P
 
 newtype SubmsgArgs = SubmsgArgs
   { topics :: Maybe String }
@@ -33,11 +37,18 @@ parseArgs = SubmsgArgs
 
 getSubs :: Maybe String -> IO [FilePath]
 getSubs (Just t) = do
-  -- TODO: parse out subs that don't match t
-  listDirectory "/dev/baf/"
+  let ts = BS.pack t
+  d <- listDirectory "/dev/baf"
+  let ds = P.map BS.pack d
+  let s = P.filter (\l -> BS.length l > 0 && P.elem l ds) $ P.map BS.strip $ BS.split ',' ts
+  if P.null s
+    then error "No valid topics"
+  else
+    return (P.map (T.unpack . TE.decodeUtf8) s)
+
   
 getSubs Nothing = do
-  listDirectory "/dev/baf/"
+  listDirectory "/dev/baf"
 
 startSubs :: FilePath -> TChan BS.ByteString -> IO ()
 startSubs f c = do

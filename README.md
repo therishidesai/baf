@@ -72,8 +72,8 @@ in this repo.
 
 ## TODO
 
-- add topic filtering to submsg
 - remove the need for statically defining the system
-  - create the `/dev/baf` devices dynamically when pubmsg or submsg gets ran
+  - create the `/dev/baf` devices dynamically when pubmsg or submsg
+    gets ran
 - improve submsg throughput
 - add tests for correctness and perf
