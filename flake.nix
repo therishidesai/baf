@@ -29,7 +29,42 @@
         packages.pubmsg = flake.packages."baf:exe:pubmsg";
         packages.submsg = flake.packages."baf:exe:submsg";
 
-        nixosModules.baf = { config, lib, pkgs, ... }:
+        packages.baf-test = pkgs.nixosTest {
+          name = "ipc-regression-test";
+          nodes.machine = { config, lib, ... }: {
+            imports = lib.attrValues self.nixosModules;
+
+            config = {
+              users.users = {
+                baf = {
+                  isNormalUser = true;
+                  password = "baf";
+                  description = "baf";
+                  extraGroups = [ "networkmanager" "wheel" "dialout" "i2c" ];
+                };
+              };
+
+              baf.services.baf-setup = {
+                enable = true;
+                topics = [ "test" ];
+              };
+              
+              environment.systemPackages = [
+                pkgs.tmux
+                self.packages."${system}".pubmsg
+                self.packages."${system}".submsg
+              ];
+            };
+
+          };
+
+          testScript = ''
+            start_all()
+            machine.wait_for_unit("baf.service")
+          '';
+        };
+      }) // {
+        nixosModules.default = { config, lib, pkgs, ... }:
           with lib;
           let cfg = config.baf.services.baf-setup;
               pubs = [ "baf-test" ] ++ cfg.topics;
@@ -76,42 +111,7 @@
               };
             };
           };
-
-        packages.baf-test = pkgs.nixosTest {
-          name = "ipc-regression-test";
-          nodes.machine = { config, lib, ... }: {
-            imports = lib.attrValues self.nixosModules."${system}";
-
-            config = {
-              users.users = {
-                baf = {
-                  isNormalUser = true;
-                  password = "baf";
-                  description = "baf";
-                  extraGroups = [ "networkmanager" "wheel" "dialout" "i2c" ];
-                };
-              };
-
-              baf.services.baf-setup = {
-                enable = true;
-                topics = [ "test" ];
-              };
-              
-              environment.systemPackages = [
-                pkgs.tmux
-                self.packages."${system}".pubmsg
-                self.packages."${system}".submsg
-              ];
-            };
-
-          };
-
-          testScript = ''
-            start_all()
-            machine.wait_for_unit("baf.service")
-          '';
-        };
-      });
+      };
 
   # --- Flake Local Nix Configuration ----------------------------
   nixConfig = {
