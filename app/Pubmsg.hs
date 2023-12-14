@@ -2,11 +2,13 @@ module Main where
 
 import qualified Data.ByteString as BS
 
-import Control.Monad
+import Control.Exception
 
 import Data.Maybe
 
 import System.IO
+import System.IO.Error
+
 import System.Exit
 import System.FileLock
 import System.Directory
@@ -36,11 +38,19 @@ writeDev d = do
   fd <- openFd d ReadWrite Nothing defaultFileFlags
   h <- fdToHandle fd
   hSetBuffering h LineBuffering
-
-  mapM_ ((BS.hPut h . flip BS.snoc 0xA)  =<<) lines'
-
-  hClose h
-  closeFd fd
+  let loop = do
+        s <- try $ mapM_ ((BS.hPut h . flip BS.snoc 0xA)  =<<) lines'
+        case s of
+          Right _ -> loop
+          Left e -> do
+            if isEOFError e then do
+              hPutStrLn stderr "Got EOF"
+              hClose h
+              pure ()
+            else do
+              hClose h
+              die $ "IOError " ++ show e
+  loop
 
 lines' :: [IO BS.ByteString]
 lines' = repeat BS.getLine
@@ -53,7 +63,7 @@ startPubmsg (PubmsgArgs t) = do
                      then die "Topic does not exist"
                      else print "Topic does exist"
                    lockTopic (t' ++ ".lock")
-                   forever $ writeDev t'
+                   writeDev t'
 
 main :: IO ()
 main = startPubmsg =<< execParser opts
