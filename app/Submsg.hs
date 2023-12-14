@@ -1,17 +1,19 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import System.IO
+import System.IO.Error
 import System.Directory
 import System.Posix.IO
-import System.Posix.Files
 
 import Data.Text as T
 import Data.Text.Encoding as TE
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as BSL
 
 import Control.Monad
 
+import Control.Exception
 import Control.Concurrent
 import Control.Concurrent.STM
 
@@ -24,11 +26,26 @@ data SubmsgArgs = SubmsgArgs
     exclude :: Bool }
 
 
-subWorker :: Handle -> TChan BS.ByteString -> IO ()
-subWorker h c = forever $ do
-  -- TODO: ByteString Lazy for performance?
-  l <- BS.hGetLine h
-  atomically $ writeTChan c l
+subWorker :: FilePath -> TChan BS.ByteString -> IO ()
+subWorker f c = do
+  fd <- openFd f ReadOnly Nothing defaultFileFlags
+  h <- fdToHandle fd
+  hSetBuffering h LineBuffering
+  let loop = do
+        -- TODO: ByteString Lazy for performance?
+        l <- try $ BS.hGetLine h
+        case l of
+          Right l' -> do
+            atomically $ writeTChan c l'
+            loop
+          Left e -> do
+            if isResourceVanishedError e then do
+              hPutStrLn stderr "Reopening device since resource vanished"
+              hClose h
+              subWorker f c
+            else
+              pure ()
+  loop
 
 parseArgs :: Parser SubmsgArgs
 parseArgs = SubmsgArgs
@@ -45,7 +62,7 @@ getSubs :: Maybe String -> Bool -> IO [FilePath]
 getSubs (Just t) True = do
   let ts = BS.pack t
   d <- listDirectory "/dev/baf"
-  let s = P.filter (\l -> BS.length l > 0) $ P.map BS.strip $ BS.split ',' ts
+  let s = P.filter (\l -> BS.length l > 0 && not (BS.isInfixOf ".lock" l) ) $ P.map BS.strip $ BS.split ',' ts
   let ss = P.map (T.unpack .TE.decodeUtf8) s
   return (P.filter (`P.notElem` ss) d)
 
@@ -53,7 +70,7 @@ getSubs (Just t) False = do
   let ts = BS.pack t
   d <- listDirectory "/dev/baf"
   let ds = P.map BS.pack d
-  let s = P.filter (\l -> BS.length l > 0 && P.elem l ds) $ P.map BS.strip $ BS.split ',' ts
+  let s = P.filter (\l -> BS.length l > 0 && P.elem l ds && not (BS.isInfixOf ".lock" l) ) $ P.map BS.strip $ BS.split ',' ts
   if P.null s
     then error "No valid topics"
   else
@@ -65,10 +82,7 @@ getSubs Nothing _ = do
 
 startSubs :: FilePath -> TChan BS.ByteString -> IO ()
 startSubs f c = do
-  fd <- openFd f ReadOnly Nothing defaultFileFlags
-  h <- fdToHandle fd
-  hSetBuffering h LineBuffering
-  _ <- forkIO $ subWorker h c
+  _ <- forkIO $ subWorker f c
   return ()
 
 startSubmsg :: SubmsgArgs -> IO ()
