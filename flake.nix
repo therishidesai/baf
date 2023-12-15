@@ -1,6 +1,7 @@
 {
   # This is a template created by `hix init`
   inputs.haskellNix.url = "github:input-output-hk/haskell.nix";
+  # inputs.nixpkgs.follows = "haskellNix/nixpkgs-unstable";
   inputs.nixpkgs.url = "github:therishidesai/nixpkgs/rdesai/haskell-fanout";
   inputs.flake-utils.url = "github:numtide/flake-utils";
   outputs = { self, nixpkgs, flake-utils, haskellNix }:
@@ -25,8 +26,14 @@
       in flake // {
         legacyPackages = pkgs;
 
-        packages.pubmsg = flake.packages."baf:exe:pubmsg";
-        packages.submsg = flake.packages."baf:exe:submsg";
+        packages.pubmsg-hix = flake.packages."baf:exe:pubmsg";
+        packages.submsg-hix = flake.packages."baf:exe:submsg";
+        packages.pubmsg = pkgs.haskellPackages.developPackage {
+          root = ./.;
+        };
+        packages.submsg = pkgs.haskellPackages.developPackage {
+          root = ./.;
+        };
 
         packages.baf-test = pkgs.nixosTest {
           name = "ipc-regression-test";

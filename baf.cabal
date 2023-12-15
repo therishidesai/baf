@@ -73,7 +73,7 @@ executable pubmsg
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.16.4.0,
+    build-depends:    base,
                       bytestring,
                       directory,
                       filelock,
@@ -100,7 +100,7 @@ executable submsg
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.16.4.0,
+    build-depends:    base,
                       bytestring,
                       directory,
                       optparse-applicative,
